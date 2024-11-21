@@ -15,17 +15,20 @@ trait Borrowable: Temporal {
     fn checkout_at(&mut self, year: u32) -> Result<(), String>;
     fn return_at(&mut self, year: u32) -> Result<(), String>;
 }
+
+#[derive(Debug)]
 struct Timeline {
     // year could be signed, to allow for BC years
     start_year: u32,
-    end_year: Option<u32>
+    end_year: Option<u32>,
 }
 // a book that can exist across time
+#[derive(Debug)]
 struct Book<'a> {
     title: String,
     author: &'a str,
     timeline: Timeline,
-    checkout_history: HashMap<u32, bool>
+    checkout_history: HashMap<u32, bool>,
 }
 
 impl<'a> Book<'a> {
@@ -33,7 +36,10 @@ impl<'a> Book<'a> {
         Book {
             title,
             author,
-            timeline: Timeline { start_year, end_year },
+            timeline: Timeline {
+                start_year,
+                end_year,
+            },
             checkout_history: HashMap::new(),
         }
     }
@@ -45,14 +51,15 @@ impl<'a> Temporal for Book<'a> {
     }
 
     fn exists_at(&self, year: u32) -> bool {
-        year >= self.timeline.start_year && match self.timeline.end_year {
-            Some(end) => year <= end,
-            None => true
-        }
+        year >= self.timeline.start_year
+            && match self.timeline.end_year {
+                Some(end) => year <= end,
+                None => true,
+            }
     }
 }
 
-impl <'a> Borrowable for Book<'a> {
+impl<'a> Borrowable for Book<'a> {
     fn is_available_at(&self, year: u32) -> bool {
         if !self.exists_at(year) {
             return false;
@@ -81,7 +88,10 @@ impl <'a> Borrowable for Book<'a> {
         }
 
         if !self.is_available_at(year) {
-            return Err(format!("'{}' is already checked out in year {}", self.title, year));
+            return Err(format!(
+                "'{}' is already checked out in year {}",
+                self.title, year
+            ));
         }
 
         self.checkout_history.insert(year, true);
@@ -108,6 +118,13 @@ impl<'a> TimeLibrary<'a> {
             .filter(|book| book.is_available_at(year))
             .collect()
     }
+
+    fn get_book_by_author(&self, author: &str) -> &Book {
+        self.books
+            .iter()
+            .find(|book| book.author == author)
+            .unwrap()
+    }
 }
 
 fn main() {
@@ -117,20 +134,38 @@ fn main() {
         "The Time Machine".to_string(),
         "H. G. Wells",
         1895,
-        None // still exists
+        None, // still exists
     ));
 
     library.add_book(Book::new(
         "Cardenio".to_string(),
         "William Shakespeare",
         1613,
-        Some(1613)
+        Some(1613),
     ));
 
-    let book = &mut library.books[1];
+    library.add_book(Book::new("1984".to_string(), "George Orwell", 1946, None));
 
+    let book = &mut library.books[0];
+
+    // test checking out a book
     match book.checkout_at(1899) {
         Ok(_) => println!("Successfully checked out '{}' in 1899!", book.title),
         Err(e) => println!("Error: {}", e),
     }
+
+    // cause a paradox
+    match book.checkout_at(1901) {
+        Ok(_) => println!("Warning: Potential time paradox created!"),
+        Err(e) => println!("Prevented paradox: {}", e),
+    }
+
+    // find available books in a specific year
+    let available = library.available_books_in_year(2024);
+
+    println!("Books available: {:#?}", available);
+
+    let orwell_book = library.get_book_by_author("George Orwell");
+
+    print!("George Orwell wrote: {:#?}", orwell_book);
 }
